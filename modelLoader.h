@@ -24,6 +24,10 @@ typedef struct{
     std::string type;
 }Texture;
 
+enum SurfacePatern{
+    TRIANGULATE = 1 // 三角形组织方式
+};
+
 class Mesh{
 public:
     /*  Mesh Data  */
@@ -38,12 +42,18 @@ class ModelLoader
 {
 public:
     ModelLoader(std::string path);
+
+    GetStepLength(){
+        return stepLength;
+    }
+    
     void RenderModel();
 
 private:
     /* Model data */
     std::vector<Mesh> meshes;
     std::string directory;
+    int stepLength; // 片元下标步长
 
 private:
     void loadModel(std::string path);

@@ -15,7 +15,7 @@ public:
     void flushBuffer(const std::vector<Mesh>&, const glm::mat4 trans);
 
 private:
-    void ConstructClassifiedTable(const std::vector<Mesh>&, const glm::mat4 trans);
+    void ConstructClassifiedTable(const std::vector<Mesh>&, const glm:tra:mat4 trans);
     void DestroyClassifiedTable();
 
     template<typename TABLE>
@@ -33,6 +33,9 @@ private:
 
     // 标识分类表是否为空
     bool empty; 
+
+    // 计算坐标的基尺
+    int standardScale;
 };
 
 #endif
