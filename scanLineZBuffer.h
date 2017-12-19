@@ -18,6 +18,8 @@ private:
     void ConstructClassifiedTable(const std::vector<Mesh>&, const glm:tra:mat4 trans);
     void DestroyClassifiedTable();
 
+    void ZBuffer();
+
     template<typename TABLE>
     void DestroyTable(std::vector<TABLE*> &table);
 
@@ -27,7 +29,7 @@ private:
     int *buffer;
     std::vector<ClassifiedPolygon*> classifiedPolygonTable;
     std::vector<ClassifiedBorder*> classifiedBorderTable;
-
+    
     // 保存转换的矩阵，避免重复计算
     glm::mat4 lastTrans;
 

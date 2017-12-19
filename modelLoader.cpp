@@ -16,8 +16,6 @@ void ModelLoader::loadModel(std::string path){
       aiProcess_Triangulate            | 
       aiProcess_FlipUVs); 
 
-    stepLength = 3;
-
     if( !scene ){
         std::cerr << "ERROR::ASSIMP::" << importer.GetErrorString() << std::endl;
         return;

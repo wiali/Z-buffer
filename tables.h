@@ -4,10 +4,10 @@
 // 多边形所在平面的方程系数
 // ax+by+cz+d=0
 struct Surface{
-    float a;
-    float b;
-    float c;
-    float d;
+    int a;
+    int b;
+    int c;
+    int d;
 };
 
 struct ClassifiedPolygon{
