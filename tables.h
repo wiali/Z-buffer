@@ -47,6 +47,8 @@ struct DynamicBorder{
     int id;
 
     DynamicBorder *next;
+    // 存放第三条分类边
+    ClassifiedBorder *third;
 };
 
 #endif

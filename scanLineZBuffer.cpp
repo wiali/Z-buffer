@@ -38,12 +38,14 @@ void ScanLineZBuffer::DestroyTable(std::vector<TABLE*> &table){
 
     for(auto iter = table.begin(); iter != table.end(); ++iter){
         if(*iter){
-            TABLE *head = iter->next;
+            TABLE *head = iter;
             iter = nullptr;
 
+            TABLE *next;
             while(head){
-                head = head->next;
+                next = head->next;
                 free(head);
+                head = next;
             }
         }
     }
@@ -72,6 +74,10 @@ inline static ClassifiedBorder* caculateBorder(RealVertex *top, RealVertex *low,
     return p;
 } 
 
+inline static float caculateDepth(Surface *s, int x, int y){
+    return -1*(s->a * x + s->b * y + s->d)/float(s->c);
+}
+
 void ScanLineZBuffer::ConstructClassifiedTable(const std::vector<Mesh>& meshes, const glm::mat4 trans){
 
     // 获取片元组织方式, 已经固定三角形组织方式
@@ -80,10 +86,6 @@ void ScanLineZBuffer::ConstructClassifiedTable(const std::vector<Mesh>& meshes, 
     // 分别记录两个表的尾指针
     std::vector<ClassifiedPolygon*> polygon(this->height, nullptr);    
     std::vector<ClassifiedBorder*> border(this->height, nullptr);
-    for(int i = 0; i != this->height; ++i){
-        polygon[i] = classifiedPolygonTable[i];
-        border[i] = classifiedBorderTable[i];
-    }
 
     // 遍历网格
     for(auto iter = meshes.begin(); iter != meshes.end(); ++iter){
@@ -150,24 +152,41 @@ void ScanLineZBuffer::ConstructClassifiedTable(const std::vector<Mesh>& meshes, 
             p->surface.b = (ymax->x - ymin->x)*(ymedium->z - ymin->z) - (ymedium->x - ymin->x)*(ymax->z - ymin->z);
             p->surface.c = (ymedium->x - ymin->x)*(ymax->y - ymin->y) - (ymax->x - ymin->x)*(ymedium->y - ymin->y);
 
+            // 该面在xoy平面上的投影是一条线，直接丢弃
+            if(p->surface.c == 0){
+                free(p);
+                continue;
+            }
+
             p->surface.d = -1 * (p->surface.a * ymin->x + p->surface.b * ymin->y + p->surface.c * ymin->z);
         
             // 入队
-            polygon[ymax->y]->next = p;
+            polygon[ymax->y] = p;
+            if(classifiedPolygonTable[ymax->y] == nullptr)
+                classifiedPolygonTable[ymax->y] = polygon[ymax->y];
             polygon[ymax->y] = polygon[ymax->y]->next;
 
             // 计算分类边表
             // 加入的第一条线(最高位)应当不是一条水平线
             if(ymax->y == ymedium->y){
-                border[ymax->y]->next = caculateBorder(ymax, ymedium, i);
+                border[ymax->y] = caculateBorder(ymax, ymedium, i);
+                if(classifiedBorderTable[ymax->y] == nullptr)
+                    classifiedBorderTable[ymax->y] = border[ymax->y];
                 border[ymax->y] = border[ymax->y]->next;
             }
 
-            border[ymax->y]->next = caculateBorder(ymax, ymin, i);
+            border[ymax->y] = caculateBorder(ymax, ymin, i);
+            if(classifiedBorderTable[ymax->y] == nullptr)
+                classifiedBorderTable[ymax->y] = border[ymax->y];
             border[ymax->y] = border[ymax->y]->next;
 
-            border[ymedium->y]->next = caculateBorder(ymedium, ymin, i);
-            border[ymedium->y] = border[ymedium->y]->next;
+            // 加入的第三条(最低位)应当不是一条水平线
+            if(ymedium->y == ymin->y){
+                border[ymedium->y] = caculateBorder(ymedium, ymin, i);
+                if(classifiedBorderTable[ymedium->y] == nullptr)
+                    classifiedBorderTable[ymedium->y] == border[ymedium->y];
+                border[ymedium->y] = border[ymedium->y]->next;
+            }
         }
 
     }
@@ -182,16 +201,22 @@ void ScanLineZBuffer::ZBuffer(){
     // 活化多边形表的尾部
     DynamicPolygon* tailPolygon = nullptr;
 
-    // 活化边表
+    // 活化边对表
     DynamicBorder* dynamicBorderTable = nullptr;
-    // 活化边表的尾部
+    // 活化边表队的尾部
     DynamicBorder* tailBorder = nullptr;
+    // 指向片元的左右边
+    ClassifiedBorder *left_DB, *right_DB;
 
     // 从上向下扫描
     for(int scanline = height-1; scanline >= 0; --scanline){
         memset(zbuffer, -1*width*height, width);
         // 从分类多边形表加入活化表
-        ClassifiedPolygon* classifiedPolygon = classifiedPolygonTable[scanline]->next;
+        ClassifiedPolygon* classifiedPolygon = classifiedPolygonTable[scanline];
+        // 从分类边表加入活化边表
+        ClassifiedBorder* classifiedBorder = classifiedBorderTable[scanline];
+
+        // 按照1个多边形、两条或三条边的方式遍历
         while(classifiedPolygon){
             // 填充DynamicPolygon结构
             DynamicPolygon* p = static_cast<DynamicPolygon*>(malloc(sizeof(DynamicPolygon)));
@@ -209,23 +234,62 @@ void ScanLineZBuffer::ZBuffer(){
                 tailPolygon = tailPolygon->next;
             }
 
+            // 判断左右边
+            if(classifiedBorder->dx <= 0){
+                left_DB = classifiedBorder;
+                right_DB = classifiedBorder->next;
+            }
+            else{
+                left_DB = classifiedBorder->next;
+                right_DB = classifiedBorder;
+            }
+            // 调整classifeidBorder使其指向潜在的第三条未被交的线
+            classifiedBorder = classifiedBorder->next->next;
+
+            // 填充DynamicBorder结构
+            DynamicBorder* q = static_cast<DynamicBorder*>(malloc(sizeof(DynamicBorder)));
+            q->xl = left_DB->x;
+            q->dxl = left_DB->dx;
+            q->dyl = left_DB->dy;
+            q->xr = right_DB->x;
+            q->dxr = right_DB->dx;
+            q->dyr = right_DB->dy;
+            q->zl =  caculateDepth(&(classifiedPolygon->surface), q->xl, scanline);  
+            q->dzx =  -1 * classifiedPolygon->surface.a / float(classifiedPolygon->surface.c);
+            q->dzy = classifiedPolygon->surface.b / float(classifiedPolygon->surface.c);
+            q->id =  classifiedPolygon->id;
+
+            // 检测该面是否还有第三条边
+            if(classifiedBorder->id == q->id){
+                q->third = classifiedBorder;
+                // 最后一次调整classifiedBorder指针，使其指向一个新片元
+                classifiedBorder = classifiedBorder->next;
+            }
+            else
+                q->third = nullptr;
+            q->next = nullptr;
+
+            // 如果活化边表为空，则首位指针指向新建节点
+            if(dynamicBorderTable == nullptr){
+                dynamicBorderTable = q;
+                tailBorder = q;
+            }
+            else{
+                // 否则，加入链表尾部
+                tailBorder->next = q;
+                tailBorder = tailBorder->next;
+            }
+
             // 分类多边形表指针后移
             classifiedPolygon = classifiedPolygon->next;
         }
 
-        // 从分类边表加入活化边表
-        ClassifiedBorder* classifedBorder = classifiedBorderTable[scanline]->next;
-        while(classifedBorder){
-            // 填充DynamicBorder结构
-            DynamicBorder* p = static_cast<DynamicBorder*>(malloc(sizeof(DynamicBorder)));
-            p->xl = scanline;
-            p->dxl = ;
-            p->dyl = ;
+        // 开始进行深度计算，遍历活化边表
+        for(DynamicBorder *head = dynamicBorderTable; head; head = head->next){
+            // 对该活化边对进行向右递增的深度计算
 
-            p->xr = scanline;
-
-            
         }
+
     }
     return;
 }
