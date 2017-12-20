@@ -15,7 +15,7 @@ public:
     void flushBuffer(const std::vector<Mesh>&, const glm::mat4 trans);
 
 private:
-    void ConstructClassifiedTable(const std::vector<Mesh>&, const glm:tra:mat4 trans);
+    void ConstructClassifiedTable(const std::vector<Mesh>&, const glm::mat4 trans);
     void DestroyClassifiedTable();
 
     void ZBuffer();

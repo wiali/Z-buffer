@@ -21,6 +21,7 @@ struct ClassifiedPolygon{
 struct DynamicPolygon{
     ClassifiedPolygon *source;
     int dy; // 多边形跨越的剩余扫描线数目
+    DynamicPolygon *next;
 };
 
 struct ClassifiedBorder{

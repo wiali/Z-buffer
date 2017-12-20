@@ -49,7 +49,7 @@ Mesh ModelLoader::processMesh(aiMesh *mesh, const aiScene *scene){
         vect.x = mesh->mVertices[i].x;
         vect.y = mesh->mVertices[i].y;
         vect.z = mesh->mVertices[i].z;
-        vertex.Postion = vect;
+        vertex.Position = vect;
 
         // normal
         vect.x = mesh->mNormals[i].x;
