@@ -23,6 +23,8 @@ private:
     template<typename TABLE>
     void DestroyTable(std::vector<TABLE*> &table);
 
+    void SetPixel(int x, int y);
+
 private:
     int width;
     int height;

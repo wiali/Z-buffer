@@ -44,7 +44,7 @@ struct DynamicBorder{
     float dzx;
     float dzy;
 
-    int id;
+    ClassifiedPolygon* source;
 
     DynamicBorder *next;
     // 存放第三条分类边

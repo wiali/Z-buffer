@@ -65,6 +65,10 @@ void ScanLineZBuffer::flushBuffer(const std::vector<Mesh>& meshes, const glm::ma
     empty = false;
 }
 
+inline void ScanLineZBuffer::SetPixel(int x, int y, int color){
+    buffer[(height - y - 1) * width + x] = color;
+}
+
 inline static ClassifiedBorder* caculateBorder(RealVertex *top, RealVertex *low, int tag){
     ClassifiedBorder *p = static_cast<ClassifiedBorder*>(malloc(sizeof(ClassifiedBorder)));
     p->x = top->x;
@@ -257,7 +261,7 @@ void ScanLineZBuffer::ZBuffer(){
             q->zl =  caculateDepth(&(classifiedPolygon->surface), q->xl, scanline);  
             q->dzx =  -1 * classifiedPolygon->surface.a / float(classifiedPolygon->surface.c);
             q->dzy = classifiedPolygon->surface.b / float(classifiedPolygon->surface.c);
-            q->id =  classifiedPolygon->id;
+            q->source =  classifiedPolygon;
 
             // 检测该面是否还有第三条边
             if(classifiedBorder->id == q->id){
@@ -285,9 +289,65 @@ void ScanLineZBuffer::ZBuffer(){
         }
 
         // 开始进行深度计算，遍历活化边表
-        for(DynamicBorder *head = dynamicBorderTable; head; head = head->next){
+        DynamicBorder *cur, *pre = nullptr;
+        for(cur = dynamicBorderTable; cur; pre = cur, cur = cur->next){
             // 对该活化边对进行向右递增的深度计算
+            float zx = cur->zl;
+            for(int ix = (cur->xl + 0.5); ix < cur->xr; ++ix, zx += cur->dzx){
+                if(zx > zbuffer[ix]){
+                    zbuffer[ix] = zx;
+                    SetPixel(ix, scanline, cur->source.color);
+                }
+            }
+            // 更新dy
+            cur->dyl -= 1;
+            cur->dyr -= 1;
+            if(cur->dyl < 0 && cur->dyr < 0){
+                // 无第三条边可用、删除本活化边
+                if(pre){
+                    pre->next = cur->next;
+                    if(tailBorder == cur)
+                        tailBorder = pre;
+                }
+                else
+                    dynamicBorderTable = cur->next;
+                free(cur);
+                cur = pre->next;
+                continue;
+            }
+            else if(cur->dyl < 0){
+                // 左边已遍历完，换入第三条边
+                cur->xl = cur->third->x;
+                cur->dxl = cur->third->dx;
+                cur->dyl = cur->third->dy;
+                cur->third = nullptr;
 
+                // 调整右边
+                cur->dyr = cur->dyr -1;
+                cur->xr = cur->xr + cur->dxr;
+            }
+            else if(cur->dyr < 0){
+                // 右边已遍历完，换入第三条边
+                cur->xr = cur->third->x;
+                cur->dxr = cur->third->dx;
+                cur->dyr = cur->third->dy;
+                cur->third = nullptr;
+
+                // 跳着左边
+                cur->dyl = cur->dyl - 1;
+                cur->xl = cur->xl + cur->dxl;
+            }
+            else{
+                // 调整双边
+                cur->dyl = cur->dyl - 1;
+                cur->xl = cur->xl + cur->dxl;
+
+                cur->dyr = cur->dyr -1;
+                cur->xr = cur->xr + cur->dxr;
+            }
+
+            // 调整深度
+            cur->zl = cur->zl + cur->dxl * cur->dzx + cur->dzy;
         }
 
     }
