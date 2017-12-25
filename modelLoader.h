@@ -44,10 +44,7 @@ class ModelLoader
 {
 public:
     ModelLoader(std::string path);
-
-    void RenderModel();
-
-private:
+public:
     /* Model data */
     std::vector<Mesh> meshes;
     std::string directory;

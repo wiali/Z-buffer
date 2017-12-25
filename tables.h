@@ -12,7 +12,6 @@ struct Surface{
 
 struct ClassifiedPolygon{
     Surface surface;
-    int id; // 多边形编号
     int dy; 
     int color; // 多边形颜色
     ClassifiedPolygon *next;
@@ -28,7 +27,7 @@ struct ClassifiedBorder{
     float x;  // 边的上端点的x坐标
     float dx; // 相邻两条扫描线交点的x坐标差dx (-1/k)
     int dy; // 边跨越的扫描线数目
-    int id; // 边所属多边形编号
+    ClassifiedPolygon *source; // 边所属多边形编号
     ClassifiedBorder *next;
 } ;
 

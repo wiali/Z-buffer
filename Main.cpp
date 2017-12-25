@@ -1,8 +1,10 @@
 #include <iostream>
 
+#include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
 #include "modelLoader.h"
+#include "scanLineZBuffer.h"
 #include "camera.h"
 
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
@@ -53,8 +55,17 @@ int main(int argc, char **argv){
     // tell GLFW to capture our mouse
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
+    // init glad
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)){
+        std::cout << "Failed to initialize GLAD" << std::endl;
+        return -1;
+    }    
+
+    glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+
     ModelLoader loader(argv[1]);
-    loader.RenderModel();
+    ScanLineZBuffer zbuffer(SCR_WIDTH, SCR_HEIGHT);
+    
     while(!glfwWindowShouldClose(window))
     {
         // per-frame time logic
@@ -73,6 +84,11 @@ int main(int argc, char **argv){
 
         // model transformation, we just do nothing.
         glm::mat4 model(1.0f);
+
+        // render
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        zbuffer.flushBuffer(loader.meshes, projection*view*model);
 
         glfwSwapBuffers(window);
         glfwPollEvents();    

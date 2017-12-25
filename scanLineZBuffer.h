@@ -2,7 +2,7 @@
 #define Z_BUFFER_H
 
 #include <vector>
-#include <modelLoader.h>
+#include "modelLoader.h"
 #include "tables.h"
 
 class ScanLineZBuffer
@@ -23,12 +23,13 @@ private:
     template<typename TABLE>
     void DestroyTable(std::vector<TABLE*> &table);
 
-    void SetPixel(int x, int y);
+    void SetPixel(int x, int y, int color);
 
 private:
     int width;
     int height;
     int *buffer;
+    int size;
     std::vector<ClassifiedPolygon*> classifiedPolygonTable;
     std::vector<ClassifiedBorder*> classifiedBorderTable;
     

@@ -5,18 +5,18 @@
 ScanLineZBuffer::ScanLineZBuffer(int w, int h)
     : width(w)
     , height(h)
-    , empty(false)
+    , empty(true)
 {
     // 固定分类表大小
     classifiedPolygonTable.resize(height, nullptr);
     classifiedBorderTable.resize(height, nullptr);
 
     // 创建buffer
-    int size = width * height; 
-    void *p = malloc(width * height);
+    size = width * height; 
+    void *p = malloc(width * height * sizeof(int));
     memset(p, 0x00, size);
 
-    buffer = static_cast<int*>(malloc(size));
+    buffer = static_cast<int*>(p);
 }
 
 ScanLineZBuffer::~ScanLineZBuffer(){
@@ -38,8 +38,8 @@ void ScanLineZBuffer::DestroyTable(std::vector<TABLE*> &table){
 
     for(auto iter = table.begin(); iter != table.end(); ++iter){
         if(*iter){
-            TABLE *head = iter;
-            iter = nullptr;
+            TABLE *head = *iter;
+            *iter = nullptr;
 
             TABLE *next;
             while(head){
@@ -55,7 +55,7 @@ void ScanLineZBuffer::DestroyTable(std::vector<TABLE*> &table){
 void ScanLineZBuffer::flushBuffer(const std::vector<Mesh>& meshes, const glm::mat4 trans){
     // 先确定变换矩阵是否变化
     // 无变化，则不需要进行转换，直接写屏
-    if(empty && (lastTrans == trans))
+    if(!empty && (lastTrans == trans))
         return;
     else if(!empty)
         DestroyClassifiedTable();
@@ -69,12 +69,12 @@ inline void ScanLineZBuffer::SetPixel(int x, int y, int color){
     buffer[(height - y - 1) * width + x] = color;
 }
 
-inline static ClassifiedBorder* caculateBorder(RealVertex *top, RealVertex *low, int tag){
+inline static ClassifiedBorder* caculateBorder(RealVertex *top, RealVertex *low, ClassifiedPolygon* source){
     ClassifiedBorder *p = static_cast<ClassifiedBorder*>(malloc(sizeof(ClassifiedBorder)));
     p->x = top->x;
     p->dx = float(low->x - top->x)/(top->y - low->y);
     p->dy = top->y - low->y;
-    p->id = tag;
+    p->source = source;
     return p;
 } 
 
@@ -110,7 +110,7 @@ void ScanLineZBuffer::ConstructClassifiedTable(const std::vector<Mesh>& meshes, 
         * w分量设为1.0,不对其它分量产生影响
         */
         glm::vec4 temp;
-        for(int i = 0; i != vertices.size(); ++i){
+        for(unsigned int i = 0; i != vertices.size(); ++i){
             temp = trans * glm::vec4(vertices[i].Position, 1.0);
             realVertices[i].x = standardScale * temp.x;
             realVertices[i].y = standardScale * temp.y;
@@ -141,9 +141,8 @@ void ScanLineZBuffer::ConstructClassifiedTable(const std::vector<Mesh>& meshes, 
                 ymedium = realVertices + indices[i + 2];
             }
 
-            // 计算分类边表
+            // 计算分类多边形表
             ClassifiedPolygon *p = static_cast<ClassifiedPolygon*>(malloc(sizeof(ClassifiedPolygon)));
-            p->id = i;
             p->dy = ymax->y - ymin->y;
             p->color = 0xFFFFFF;
             p->next = nullptr;    
@@ -164,32 +163,51 @@ void ScanLineZBuffer::ConstructClassifiedTable(const std::vector<Mesh>& meshes, 
 
             p->surface.d = -1 * (p->surface.a * ymin->x + p->surface.b * ymin->y + p->surface.c * ymin->z);
         
-            // 入队
-            polygon[ymax->y] = p;
-            if(classifiedPolygonTable[ymax->y] == nullptr)
-                classifiedPolygonTable[ymax->y] = polygon[ymax->y];
-            polygon[ymax->y] = polygon[ymax->y]->next;
+            // 入队 
+            if(classifiedPolygonTable[ymax->y] == nullptr){
+                classifiedPolygonTable[ymax->y] = p;
+                polygon[ymax->y] = p;
+            }
+            else{
+                polygon[ymax->y]->next = p;
+                polygon[ymax->y] = polygon[ymax->y]->next;
+            }
 
             // 计算分类边表
             // 加入的第一条线(最高位)应当不是一条水平线
-            if(ymax->y == ymedium->y){
-                border[ymax->y] = caculateBorder(ymax, ymedium, i);
-                if(classifiedBorderTable[ymax->y] == nullptr)
-                    classifiedBorderTable[ymax->y] = border[ymax->y];
+            if(ymax->y != ymedium->y){
+                ClassifiedBorder *temp = caculateBorder(ymax, ymedium, polygon[ymax->y]);
+                if(classifiedBorderTable[ymax->y] == nullptr){
+                    classifiedBorderTable[ymax->y] = temp;
+                    border[ymax->y] = temp;
+                }
+                else{
+                    border[ymax->y]->next = temp;
+                    border[ymax->y] = border[ymax->y]->next;
+                } 
+            }
+
+            ClassifiedBorder *temp = caculateBorder(ymax, ymin, polygon[ymax->y]);
+            if(classifiedBorderTable[ymax->y] == nullptr){
+                classifiedBorderTable[ymax->y] = temp;
+                border[ymax->y] = temp;
+            }
+            else{
+                border[ymax->y]->next = temp;
                 border[ymax->y] = border[ymax->y]->next;
             }
 
-            border[ymax->y] = caculateBorder(ymax, ymin, i);
-            if(classifiedBorderTable[ymax->y] == nullptr)
-                classifiedBorderTable[ymax->y] = border[ymax->y];
-            border[ymax->y] = border[ymax->y]->next;
-
             // 加入的第三条(最低位)应当不是一条水平线
-            if(ymedium->y == ymin->y){
-                border[ymedium->y] = caculateBorder(ymedium, ymin, i);
-                if(classifiedBorderTable[ymedium->y] == nullptr)
-                    classifiedBorderTable[ymedium->y] == border[ymedium->y];
-                border[ymedium->y] = border[ymedium->y]->next;
+            if(ymedium->y != ymin->y){
+                ClassifiedBorder *temp = caculateBorder(ymedium, ymin, polygon[ymax->y]);
+                if(classifiedBorderTable[ymedium->y] == nullptr){
+                    classifiedBorderTable[ymedium->y] = temp;
+                     border[ymedium->y] = temp;
+                }
+                else{
+                    border[ymedium->y]->next = temp;
+                    border[ymedium->y] = border[ymedium->y]->next;
+                }
             }
         }
 
@@ -264,7 +282,7 @@ void ScanLineZBuffer::ZBuffer(){
             q->source =  classifiedPolygon;
 
             // 检测该面是否还有第三条边
-            if(classifiedBorder->id == q->id){
+            if(classifiedBorder->source == q->source){
                 q->third = classifiedBorder;
                 // 最后一次调整classifiedBorder指针，使其指向一个新片元
                 classifiedBorder = classifiedBorder->next;
@@ -289,14 +307,14 @@ void ScanLineZBuffer::ZBuffer(){
         }
 
         // 开始进行深度计算，遍历活化边表
-        DynamicBorder *cur, *pre = nullptr;
+        DynamicBorder *cur, *pre = nullptr, *back = nullptr;
         for(cur = dynamicBorderTable; cur; pre = cur, cur = cur->next){
             // 对该活化边对进行向右递增的深度计算
             float zx = cur->zl;
             for(int ix = (cur->xl + 0.5); ix < cur->xr; ++ix, zx += cur->dzx){
                 if(zx > zbuffer[ix]){
                     zbuffer[ix] = zx;
-                    SetPixel(ix, scanline, cur->source.color);
+                    SetPixel(ix, scanline, cur->source->color);
                 }
             }
             // 更新dy
@@ -311,8 +329,9 @@ void ScanLineZBuffer::ZBuffer(){
                 }
                 else
                     dynamicBorderTable = cur->next;
+                back = cur->next;
                 free(cur);
-                cur = pre->next;
+                cur = back;
                 continue;
             }
             else if(cur->dyl < 0){

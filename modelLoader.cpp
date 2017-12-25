@@ -80,13 +80,3 @@ Mesh ModelLoader::processMesh(aiMesh *mesh, const aiScene *scene){
 
     return Mesh(vertices, indices, textures);  
 }
-
-void ModelLoader::RenderModel(){
-    std::cout<<"Number of meshes: "<<meshes.size()<<std::endl;
-    for(unsigned int i = 0; i < meshes.size(); ++i)
-        std::cout<<meshes[i].indices.size()<<std::endl<<std::endl;
-}
-
-const std::vector<Mesh>&  ModelLoader::GetMeshData(){
-    return meshes;
-}
