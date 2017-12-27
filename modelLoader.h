@@ -2,58 +2,45 @@
 #define MODEL_LOADER_H
 
 #include <iostream>
-#include <vector>
 #include <string>
+#include <vector>
 
-#include "assimp/Importer.hpp"      // C++ importer interface
-#include "assimp/scene.h"           // Output data structure
-#include "assimp/postprocess.h"     // Post processing fla
+#include "assimp/Importer.hpp"  // C++ importer interface
+#include "assimp/postprocess.h" // Post processing fla
+#include "assimp/scene.h"       // Output data structure
 
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtc/type_ptr.hpp"
 
-typedef struct{
-    int x;
-    int y;
-    int z;
-}RealVertex; 
+typedef struct {
+  glm::vec3 Position;
+  glm::vec3 Normal;
+  glm::vec2 TexCoords;
+} Vertex;
 
-typedef struct{
-    glm::vec3 Position;
-    glm::vec3 Normal;
-    glm::vec2 TexCoords;
-}Vertex;
-
-typedef struct{
-    unsigned int id;
-    std::string type;
-}Texture;
-
-class Mesh{
+class Mesh {
 public:
-    /*  Mesh Data  */
-    std::vector<Vertex> vertices;
-    std::vector<unsigned int> indices;
-    std::vector<Texture> textures;
+  /*  Mesh Data  */
+  std::vector<Vertex> vertices;
+  std::vector<unsigned int> indices;
 
-    Mesh(std::vector<Vertex> vertices, std::vector<unsigned int> indices, std::vector<Texture> textures);
+  Mesh(std::vector<Vertex> vertices, std::vector<unsigned int> indices);
 };
 
-class ModelLoader
-{
+class ModelLoader {
 public:
-    ModelLoader(std::string path);
+  ModelLoader(std::string path);
+
 public:
-    /* Model data */
-    std::vector<Mesh> meshes;
-    std::string directory;
+  /* Model data */
+  std::vector<Mesh> meshes;
 
 private:
-    void loadModel(std::string path);
-    void processNode(aiNode *node, const aiScene *scene);
-    Mesh processMesh(aiMesh *mesh, const aiScene *scene);
+  void loadModel(std::string path);
+  void processNode(aiNode *node, const aiScene *scene);
+  Mesh processMesh(aiMesh *mesh, const aiScene *scene);
 
-    const std::vector<Mesh>&  GetMeshData();
+  const std::vector<Mesh> &GetMeshData();
 };
 #endif
