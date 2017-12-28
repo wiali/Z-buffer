@@ -25,25 +25,18 @@ struct Surface {
   int d;
 };
 
+struct Border {
+  float x;  // 边的上端点的x坐标
+  float dx; // 相邻两条扫描线交点的x坐标差dx (-1/k)
+  int dy;   // 边跨越的扫描线数目
+};
+
 struct ClassifiedPolygon {
   Surface surface;
   int dy;
   RGB888 color; // 多边形颜色
-  ClassifiedPolygon *next;
-};
 
-struct DynamicPolygon {
-  ClassifiedPolygon *source;
-  int dy; // 多边形跨越的剩余扫描线数目
-  DynamicPolygon *next;
-};
-
-struct ClassifiedBorder {
-  float x;  // 边的上端点的x坐标
-  float dx; // 相邻两条扫描线交点的x坐标差dx (-1/k)
-  int dy;   // 边跨越的扫描线数目
-  ClassifiedPolygon *source; // 边所属多边形编号
-  ClassifiedBorder *next;
+  Border *border[3];
 };
 
 struct DynamicBorder {
@@ -62,7 +55,7 @@ struct DynamicBorder {
 
   DynamicBorder *next;
   // 存放第三条分类边
-  ClassifiedBorder *third;
+  Border *third;
 };
 
 #endif

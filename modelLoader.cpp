@@ -18,6 +18,12 @@ void ModelLoader::loadModel(std::string path) {
   }
 
   processNode(scene->mRootNode, scene);
+
+  std::cout << "This model has mesh: "<<meshes.size()<<std::endl;
+  int num = 0;
+  for(auto iter = meshes.begin(); iter != meshes.end(); ++iter)
+    num += iter->indices.size()/3;
+  std::cout << "Numbers of triangle fragement: " << num << std::endl;
 }
 
 void ModelLoader::processNode(aiNode *node, const aiScene *scene) {

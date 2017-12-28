@@ -15,9 +15,10 @@ void processInput(GLFWwindow *window);
 // settings
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
+const unsigned int SCR_DEPTH = 100;
 
 // camera
-Camera camera(glm::vec3(0.0f, 0.0f, 100.0f));
+Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
@@ -74,11 +75,11 @@ int main(int argc, char *argv[]) {
     return -1;
   }
   glfwMakeContextCurrent(window);
-  //glfwSetCursorPosCallback(window, mouse_callback);
-  //glfwSetScrollCallback(window, scroll_callback);
+  glfwSetCursorPosCallback(window, mouse_callback);
+  glfwSetScrollCallback(window, scroll_callback);
 
   // 使glfw去捕捉鼠标
-  //glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+  glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
   // 初始化glad， 加载opengl函数指针
   if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
@@ -131,10 +132,10 @@ int main(int argc, char *argv[]) {
   // 首先固定顶点信息
   float vertices[] = {
     // 位置             // 纹理
-    1.0f, 1.0f, 0.0f,  1.0f, 1.0f,
-    1.0f,-1.0f, 0.0f,  1.0f, 0.0f,
-   -1.0f,-1.0f, 0.0f,  0.0f, 0.0f,
-   -1.0f, 1.0f, 0.0f,  0.0f, 1.0f
+    1.0f, 1.0f, 0.0f,  1.0f, 0.0f,
+    1.0f,-1.0f, 0.0f,  1.0f, 1.0f,
+   -1.0f,-1.0f, 0.0f,  0.0f, 1.0f,
+   -1.0f, 1.0f, 0.0f,  0.0f, 0.0f
   };
 
   // 下标信息
@@ -180,7 +181,7 @@ int main(int argc, char *argv[]) {
   glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
 
   ModelLoader loader(argv[1]);
-  ScanLineZBuffer zbuffer(SCR_WIDTH, SCR_HEIGHT);
+  ScanLineZBuffer zbuffer(SCR_WIDTH, SCR_HEIGHT, SCR_DEPTH);
   
   while (!glfwWindowShouldClose(window)) {
     // per-frame time logic
@@ -196,7 +197,7 @@ int main(int argc, char *argv[]) {
     // view/projection transformations
     glm::mat4 projection =
         glm::perspective(glm::radians(camera.Zoom),
-                         (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+                         (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, (float)SCR_DEPTH);
     glm::mat4 view = camera.GetViewMatrix();
     // model transformation, we just do nothing.
     glm::mat4 model(1.0f);
@@ -209,6 +210,7 @@ int main(int argc, char *argv[]) {
 
     // 更新纹理数据
     texture_data = zbuffer.flushBuffer(loader.meshes, projection * view * model);
+    //texture_data = zbuffer.flushBuffer(meshes, projection * view * model);
     //texture_data = color_test(800, 600);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, texture_data);
   
