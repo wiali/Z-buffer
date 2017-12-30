@@ -8,7 +8,6 @@
 
  # 代码说明
  
-
 ``` bash
 .
 ├── camera.cpp  // 一个摄像头视角的类实现、支持视角转换
@@ -22,7 +21,7 @@
 ├── modelLoader.cpp // 加载模型
 ├── modelLoader.h
 ├── README.md
-├── resource    // 包含三个可加载model
+├── resource    // 为了节省压缩包空间，仅包含了一头狼的模型
 ├── scanLineZBuffer.cpp // 扫描线Z-Buffer实现
 └── scanLineZBuffer.h
 ```
@@ -51,3 +50,12 @@ make
 
 # 执行结果
 
+执行机为dell 灵越14r笔记本，使用mesa intel驱动。
+
+### 狼 2756块片元
+
+<div aligin=center><img src="https://github.com/zlseu-edu/Z-buffer/blob/master/wolf.jpg"></div>
+
+### 轿车 182324块片元
+
+<div aligin=center><img src="https://github.com/zlseu-edu/Z-buffer/blob/master/car.jpg"></div>
