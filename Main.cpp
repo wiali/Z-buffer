@@ -6,41 +6,39 @@
 #include "camera.h"
 #include "modelLoader.h"
 #include "scanLineZBuffer.h"
-#include "debug.h"
 
 void mouse_callback(GLFWwindow *window, double xpos, double ypos);
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
 
-// settings
+// 窗口设置
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
 const unsigned int SCR_DEPTH = 100;
 
-// camera
+// 摄像头
 Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
 
-// timing
+// 计时
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
 // 顶点着色
-const char *vertexShaderSource =
-    "#version 330 core\n"
-    "layout (location = 0) in vec3 aPos;\n"
-    "layout (location = 1) in vec2 aTexCoord;\n"
-    "out vec2 TexCoord;\n"
-    "void main()\n"
-    "{\n"
-    "   gl_Position = vec4(aPos, 1.0);\n"
-    "   TexCoord = aTexCoord;\n"
-    "}\0";
+const char *vertexShaderSource = "#version 330 core\n"
+                                 "layout (location = 0) in vec3 aPos;\n"
+                                 "layout (location = 1) in vec2 aTexCoord;\n"
+                                 "out vec2 TexCoord;\n"
+                                 "void main()\n"
+                                 "{\n"
+                                 "   gl_Position = vec4(aPos, 1.0);\n"
+                                 "   TexCoord = aTexCoord;\n"
+                                 "}\0";
 
 // 片元着色
-const char *fragmentShaderSource = 
+const char *fragmentShaderSource =
     "#version 330 core\n"
     "out vec4 FragColor;\n"
     "in vec2 TexCoord;\n"
@@ -59,6 +57,8 @@ int main(int argc, char *argv[]) {
   }
 
   GLFWwindow *window;
+  char Title[256];
+  char WindowName[] = "Z-Buffer demon";
 
   if (!glfwInit()) {
     std::cerr << "GLFW init fail." << std::endl;
@@ -69,7 +69,7 @@ int main(int argc, char *argv[]) {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-  window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Z-Buffer demo", NULL, NULL);
+  window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, WindowName, NULL, NULL);
   if (!window) {
     glfwTerminate();
     return -1;
@@ -128,20 +128,20 @@ int main(int argc, char *argv[]) {
   }
   glDeleteShader(vertexShader);
   glDeleteShader(fragmentShader);
-  
+
   // 首先固定顶点信息
   float vertices[] = {
     // 位置             // 纹理
-    1.0f, 1.0f, 0.0f,  1.0f, 0.0f,
-    1.0f,-1.0f, 0.0f,  1.0f, 1.0f,
-   -1.0f,-1.0f, 0.0f,  0.0f, 1.0f,
-   -1.0f, 1.0f, 0.0f,  0.0f, 0.0f
+    1.0f,  1.0f, 0.0f, 1.0f,  0.0f,  
+    1.0f, -1.0f, 0.0f, 1.0f,  1.0f, 
+   -1.0f, -1.0f, 0.0f, 0.0f,  1.0f, 
+   -1.0f,  1.0f, 0.0f, 0.0f,  0.0f
   };
 
   // 下标信息
-  unsigned int indices[] = {  
-        0, 1, 3, // first triangle
-        1, 2, 3  // second triangle
+  unsigned int indices[] = {
+      0, 1, 3,  // first triangle
+      1, 2, 3   // second triangle
   };
 
   // 纹理数据
@@ -158,7 +158,8 @@ int main(int argc, char *argv[]) {
   glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices,
+               GL_STATIC_DRAW);
   // 位置属性
   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)0);
   glEnableVertexAttribArray(0);
@@ -171,7 +172,7 @@ int main(int argc, char *argv[]) {
   unsigned int texture;
   glGenTextures(1, &texture);
   glBindTexture(GL_TEXTURE_2D, texture);
-  
+
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
@@ -180,9 +181,16 @@ int main(int argc, char *argv[]) {
 
   glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
 
+  // 模型加载器
   ModelLoader loader(argv[1]);
-  ScanLineZBuffer zbuffer(SCR_WIDTH, SCR_HEIGHT, SCR_DEPTH);
-  
+  int numOfFragment = loader.GetFragNumber();
+
+  // 定义物体本体色
+  glm::vec3 objectColor = glm::vec3(0.5f);
+
+  // 定义Z-Buffer扫描器
+  ScanLineZBuffer zbuffer(SCR_WIDTH, SCR_HEIGHT, SCR_DEPTH, objectColor);
+  // debug_cube();
   while (!glfwWindowShouldClose(window)) {
     // per-frame time logic
     // --------------------
@@ -190,30 +198,34 @@ int main(int argc, char *argv[]) {
     deltaTime = currentFrame - lastFrame;
     lastFrame = currentFrame;
 
-    // input
-    // -----
+    // 重置窗口文字，显示fps，片元数量
+    snprintf(Title, 255, "%s  %d Fragments - [FPS: %.2f]", WindowName, numOfFragment, 1/deltaTime);
+    glfwSetWindowTitle (window, Title);
+
+    // 输入事件捕捉
     processInput(window);
 
-    // view/projection transformations
-    glm::mat4 projection =
-        glm::perspective(glm::radians(camera.Zoom),
-                         (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, (float)SCR_DEPTH);
+    // view/projection 转换
+    glm::mat4 projection = glm::perspective(
+        glm::radians(camera.GetZoomValue()), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f,
+        (float)SCR_DEPTH);
     glm::mat4 view = camera.GetViewMatrix();
-    // model transformation, we just do nothing.
+    // model转换，不需要
     glm::mat4 model(1.0f);
 
     // render
     glClear(GL_COLOR_BUFFER_BIT);
-    
+
     // 绑定texture
     glBindTexture(GL_TEXTURE_2D, texture);
 
     // 更新纹理数据
-    texture_data = zbuffer.flushBuffer(loader.meshes, projection * view * model);
-    //texture_data = zbuffer.flushBuffer(meshes, projection * view * model);
-    //texture_data = color_test(800, 600);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, texture_data);
-  
+    texture_data = zbuffer.flushBuffer(
+        loader.GetMeshData(), projection * view * model);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB,
+                 GL_UNSIGNED_BYTE, texture_data);
+
     glUseProgram(shaderProgram);
     glBindVertexArray(VAO);
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
@@ -231,8 +243,8 @@ int main(int argc, char *argv[]) {
   return 0;
 }
 
-// process all input: query GLFW whether relevant keys are pressed/released this
-// frame and react accordingly
+// W、A、S、D 方向键控制回调，提供旋转操作
+// ESC 键退出程序
 // ---------------------------------------------------------------------------------------------------------
 void processInput(GLFWwindow *window) {
   if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
@@ -248,7 +260,7 @@ void processInput(GLFWwindow *window) {
     camera.ProcessKeyboard(RIGHT, deltaTime);
 }
 
-// glfw: whenever the mouse moves, this callback is called
+// glfw: 鼠标移动回调
 // -------------------------------------------------------
 void mouse_callback(GLFWwindow *window, double xpos, double ypos) {
   if (firstMouse) {
@@ -259,7 +271,7 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos) {
 
   float xoffset = xpos - lastX;
   float yoffset =
-      lastY - ypos; // reversed since y-coordinates go from bottom to top
+      lastY - ypos;
 
   lastX = xpos;
   lastY = ypos;
@@ -267,7 +279,7 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos) {
   camera.ProcessMouseMovement(xoffset, yoffset);
 }
 
-// glfw: whenever the mouse scroll wheel scrolls, this callback is called
+// glfw: 鼠标滑轮回调, 可以拉近(远)视角
 // ----------------------------------------------------------------------
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset) {
   camera.ProcessMouseScroll(yoffset);

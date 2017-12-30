@@ -9,30 +9,16 @@
 #include "assimp/postprocess.h" // Post processing fla
 #include "assimp/scene.h"       // Output data structure
 
-#include "glm/glm.hpp"
-#include "glm/gtc/matrix_transform.hpp"
-#include "glm/gtc/type_ptr.hpp"
-
-typedef struct {
-  glm::vec3 Position;
-  glm::vec3 Normal;
-  glm::vec2 TexCoords;
-} Vertex;
-
-class Mesh {
-public:
-  /*  Mesh Data  */
-  std::vector<Vertex> vertices;
-  std::vector<unsigned int> indices;
-
-  Mesh(std::vector<Vertex> vertices, std::vector<unsigned int> indices);
-};
+#include "common.h"
 
 class ModelLoader {
 public:
   ModelLoader(std::string path);
 
-public:
+  const std::vector<Mesh> &GetMeshData();
+  int GetFragNumber();
+
+private:
   /* Model data */
   std::vector<Mesh> meshes;
 
@@ -40,7 +26,5 @@ private:
   void loadModel(std::string path);
   void processNode(aiNode *node, const aiScene *scene);
   Mesh processMesh(aiMesh *mesh, const aiScene *scene);
-
-  const std::vector<Mesh> &GetMeshData();
 };
 #endif

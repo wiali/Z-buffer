@@ -1,9 +1,8 @@
 #include "scanLineZBuffer.h"
-#include <cstdlib>
-#include <iostream>
 
-ScanLineZBuffer::ScanLineZBuffer(int w, int h, int d)
+ScanLineZBuffer::ScanLineZBuffer(int w, int h, int d, glm::vec3 color)
     : width(w), height(h), depth(d), empty(true) {
+  objectColor = color;
   // 固定分类多边形表大小
   classifiedPolygonTable.resize(height);
 
@@ -26,13 +25,13 @@ void ScanLineZBuffer::DestroyClassifiedTable() {
 
   // 释放分类多边形表
   for (auto iter = classifiedPolygonTable.begin();
-       iter != classifiedPolygonTable.end(); ++iter){
+       iter != classifiedPolygonTable.end(); ++iter) {
     for (auto pos = iter->begin(); pos != iter->end(); ++pos) {
       DestroyPolygon(*pos);
       *pos = nullptr;
     }
-    if( !iter->empty() )
-     iter->clear();
+    if (!iter->empty())
+      iter->clear();
   }
 }
 
@@ -49,12 +48,14 @@ void ScanLineZBuffer::DestroyPolygon(ClassifiedPolygon *polygon) {
 }
 
 char *ScanLineZBuffer::flushBuffer(const std::vector<Mesh> &meshes,
-                                   const glm::mat4 trans) {
+                                   const glm::mat4 &trans) {
   // 先确定变换矩阵是否变化
   // 无变化，则不需要进行转换，直接写屏
-  if (!empty && (lastTrans == trans))
-    return reinterpret_cast<char *>(buffer);
-  else if (!empty)
+  // if (!empty && (lastTrans == trans))
+  //  return reinterpret_cast<char *>(buffer);
+  // else if (!empty)
+  //  DestroyClassifiedTable();
+  if (!empty)
     DestroyClassifiedTable();
 
   // 清空buffer
@@ -67,11 +68,18 @@ char *ScanLineZBuffer::flushBuffer(const std::vector<Mesh> &meshes,
   return reinterpret_cast<char *>(buffer);
 }
 
-inline void ScanLineZBuffer::SetPixel(int x, int y, RGB888 color) {
-  buffer[(height - y - 1) * width + x] = color;
+// 设置(x, y)处的颜色值，需要将glm::vec3进行一次转换
+inline void ScanLineZBuffer::SetPixel(int x, int y, glm::vec3 color) {
+  buffer[(height - y - 1) * width + x].r =
+      (color.x > 1 ? 0xFF : 0xFF * color.x);
+  buffer[(height - y - 1) * width + x].g =
+      (color.y > 1 ? 0xFF : 0xFF * color.y);
+  buffer[(height - y - 1) * width + x].b =
+      (color.z > 1 ? 0xFF : 0xFF * color.z);
 }
 
-inline static Border *caculateBorder(RealVertex *top, RealVertex *low) {
+// 根据两点计算边
+inline static Border *caculateBorder(RealVertice *top, RealVertice *low) {
   Border *p = static_cast<Border *>(malloc(sizeof(Border)));
   p->x = top->x;
   p->dx = float(low->x - top->x) / (top->y - low->y);
@@ -79,6 +87,7 @@ inline static Border *caculateBorder(RealVertex *top, RealVertex *low) {
   return p;
 }
 
+// 根据面方程系数、和(x, y)坐标，计算z值
 inline static float caculateDepth(Surface *s, int x, int y) {
   return -1 * (s->a * x + s->b * y + s->d) / float(s->c);
 }
@@ -90,7 +99,6 @@ inline static void clearZBuffer(int *buffer, int value, int w) {
 
 void ScanLineZBuffer::ConstructClassifiedTable(const std::vector<Mesh> &meshes,
                                                const glm::mat4 trans) {
-
   // 获取片元组织方式, 已经固定三角形组织方式
   int stepLength = 3;
 
@@ -104,7 +112,7 @@ void ScanLineZBuffer::ConstructClassifiedTable(const std::vector<Mesh> &meshes,
     int sizeOfIndices = indices.size();
 
     // 保存转换后的节点坐标
-    RealVertex realVertices[vertices.size()];
+    RealVertice realVertices[vertices.size()];
     /*
      * 将片元的坐标转换为标准屏幕坐标
      * 所有变换的矩阵trans
@@ -120,9 +128,9 @@ void ScanLineZBuffer::ConstructClassifiedTable(const std::vector<Mesh> &meshes,
       realVertices[i].z = (temp.z / temp.w + 0.5) * this->depth;
     }
 
-    RealVertex *ymax; // 指向三角形三个顶点顶点中y值最大点
-    RealVertex *ymin;
-    RealVertex *ymedium;
+    RealVertice *ymax; // 指向三角形三个顶点顶点中y值最大点
+    RealVertice *ymin;
+    RealVertice *ymedium;
 
     for (int i = 0; i < sizeOfIndices; i += stepLength) { // 按片元节点数步进
 
@@ -152,9 +160,9 @@ void ScanLineZBuffer::ConstructClassifiedTable(const std::vector<Mesh> &meshes,
           static_cast<ClassifiedPolygon *>(malloc(sizeof(ClassifiedPolygon)));
       p->dy = ymax->y - ymin->y;
 
-      p->color.r = 0xFF;
-      p->color.g = 0xFF;
-      p->color.b = 0xFF;
+      // 设定片元颜色
+      p->color = this->objectColor;
+
       /*
        * 求平面系数, 点法式
        * A(x - x0) + B(y - y0) + C(z - z0) + D = 0
@@ -249,7 +257,7 @@ void ScanLineZBuffer::ZBuffer() {
 
       // 填充DynamicBorder结构
       DynamicBorder *q =
-                static_cast<DynamicBorder *>(malloc(sizeof(DynamicBorder)));
+          static_cast<DynamicBorder *>(malloc(sizeof(DynamicBorder)));
       q->xl = left_DB->x;
       q->dxl = left_DB->dx;
       q->dyl = left_DB->dy;
@@ -281,24 +289,29 @@ void ScanLineZBuffer::ZBuffer() {
     // 开始进行深度计算，遍历活化边表
     DynamicBorder *cur, *pre = nullptr;
     cur = dynamicBorderTable;
-    while( cur ) {
+    while (cur) {
       // 对该活化边对进行向右递增的深度计算
       float zx = cur->zl;
+      bool first = true;
       for (int ix = (cur->xl + 0.5); ix <= cur->xr; ++ix, zx += cur->dzx)
-        if (ix >= 0 && ix < width) 
-          if(zx > zbuffer[ix]){
+        if (ix >= 0 && ix < width)
+          if (zx > zbuffer[ix]) {
             zbuffer[ix] = zx;
-            SetPixel(ix, scanline, cur->source->color);
-        }
-      
+            if (first) {
+              // 控制边色为黑色
+              SetPixel(ix, scanline, glm::vec3(0.0f));
+              first = false;
+            } else
+              SetPixel(ix, scanline, objectColor);
+          }
       // 更新dy
       cur->dyl -= 1;
       cur->dyr -= 1;
       if (cur->dyl == 0 && cur->dyr == 0) {
         // 无第三条边可用、删除本活化边
-        if(cur == dynamicBorderTable){
+        if (cur == dynamicBorderTable) {
           dynamicBorderTable = cur->next;
-          if(cur == tailBorder ){
+          if (cur == tailBorder) {
             tailBorder = nullptr;
             free(cur);
             break;
@@ -306,14 +319,12 @@ void ScanLineZBuffer::ZBuffer() {
           free(cur);
           cur = dynamicBorderTable;
           continue;
-        }
-        else if(cur == tailBorder){
+        } else if (cur == tailBorder) {
           tailBorder = pre;
           tailBorder->next = nullptr;
           free(cur);
           break;
-        }
-        else{
+        } else {
           cur = cur->next;
           free(pre->next);
           pre->next = cur;

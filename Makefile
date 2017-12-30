@@ -5,8 +5,8 @@ INCLUDES = -I$(CURRENT_DIR)/include
 CC = gcc
 CXX = g++
 
-LIBS = -L$(CURRENT_DIR)/lib -lglfw -lassimp -ldl
-CXXFLAGS = -Wl,-rpath=$(CURRENT_DIR)/lib -Wall -std=c++11 -g
+LIBS = -lglfw -lassimp -ldl
+CXXFLAGS = -Wall -std=c++11 -g
 
 OBJS = Main.o modelLoader.o camera.o scanLineZBuffer.o glad.o
 

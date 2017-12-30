@@ -1,10 +1,5 @@
 #include "modelLoader.h"
 
-Mesh::Mesh(std::vector<Vertex> vertices, std::vector<unsigned int> indices) {
-  this->vertices = vertices;
-  this->indices = indices;
-}
-
 ModelLoader::ModelLoader(std::string path) { loadModel(path); }
 
 void ModelLoader::loadModel(std::string path) {
@@ -18,19 +13,12 @@ void ModelLoader::loadModel(std::string path) {
   }
 
   processNode(scene->mRootNode, scene);
-
-  std::cout << "This model has mesh: "<<meshes.size()<<std::endl;
-  int num = 0;
-  for(auto iter = meshes.begin(); iter != meshes.end(); ++iter)
-    num += iter->indices.size()/3;
-  std::cout << "Numbers of triangle fragement: " << num << std::endl;
 }
 
 void ModelLoader::processNode(aiNode *node, const aiScene *scene) {
   for (unsigned int i = 0; i < node->mNumMeshes; ++i) {
     aiMesh *mesh = scene->mMeshes[node->mMeshes[i]];
     meshes.push_back(processMesh(mesh, scene));
-    ;
   }
 
   for (unsigned int i = 0; i < node->mNumChildren; ++i) {
@@ -50,7 +38,7 @@ Mesh ModelLoader::processMesh(aiMesh *mesh, const aiScene *scene) {
     vect.y = mesh->mVertices[i].y;
     vect.z = mesh->mVertices[i].z;
     vertex.Position = vect;
-    
+
     // normal
     vect.x = mesh->mNormals[i].x;
     vect.y = mesh->mNormals[i].y;
@@ -64,7 +52,8 @@ Mesh ModelLoader::processMesh(aiMesh *mesh, const aiScene *scene) {
       vect.y = mesh->mTextureCoords[0][i].y;
       vertex.TexCoords = vect;
     } else
-    vertex.TexCoords = glm::vec2(0.0f, 0.0f);
+      vertex.TexCoords = glm::vec2(0.0f, 0.0f);
+
     vertices.push_back(vertex);
   }
 
@@ -76,4 +65,13 @@ Mesh ModelLoader::processMesh(aiMesh *mesh, const aiScene *scene) {
   }
 
   return Mesh(vertices, indices);
+}
+
+const std::vector<Mesh>& ModelLoader::GetMeshData() { return this->meshes; }
+
+int ModelLoader::GetFragNumber(){
+  int num = 0;
+  for (auto iter = meshes.begin(); iter != meshes.end(); ++iter)
+    num += iter->indices.size() / 3;
+  return num;
 }
